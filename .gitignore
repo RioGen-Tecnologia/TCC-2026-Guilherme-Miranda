@@ -1,0 +1,16 @@
+.Rproj.user
+.Rhistory
+*.RData
+.Ruserdata
+.positai
+.Rproj.user/
+data/raw/
+renv/library/
+tmp/
+cache/
+GDCdata/
+*.tar.gz
+MANIFEST.txt
+.venv/
+__pycache__/
+*.pyc
