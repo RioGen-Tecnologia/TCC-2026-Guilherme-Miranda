@@ -28,6 +28,8 @@ library(ReactomePA) #enriquecimento funcional (Reactome)
 library(enrichplot) #pacote de gráficos de enriquecimento
 library(STRINGdb) #pacote de rede PPi
 library(igraph) #complemento do grafico de rede PPI
+library(recount3) #pacote da base de dados recount3 para validação
+library(edgeR) #pacote para validação
 library(ggrepel)
 library(pheatmap) # heatmap
 library(circlize) #complemento de heatmap
