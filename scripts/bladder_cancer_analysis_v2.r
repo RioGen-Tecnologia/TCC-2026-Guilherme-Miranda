@@ -36,7 +36,7 @@ for (d in dirs) {
 # Master Manifesto com anotações das amostras
 metadata_path <- list.files(
   here("metadata"),
-  pattern = "bladder_cancer_metadata_sem_amostras_GSE37817.csv",
+  pattern = "bladder_cancer_metadata_amostras_filtradas_QC.csv",
   full.names = TRUE
 )
 
@@ -187,6 +187,7 @@ expr_combat <- ComBat(
   mod   = mod
 )
 
+## Gráficos PCA
 
 message("===========================================================================")
 message("GERANDO E EXPORTANDO GRÁFICOS DE PCA (BEFORE VS AFTER COMBAT)")
@@ -315,7 +316,7 @@ pca_biology_panel <- (p3 | p4) +
 
 # Salvar imagens em alta resolução
 ggsave(
-  filename = file.path(figures_dir, "pca_batch_effect_combat.png"),
+  filename = file.path(figures_dir, "pca_batch_effect_combat_QC.png"),
   plot     = pca_batch_panel,
   width    = 14,
   height   = 6,
@@ -323,7 +324,7 @@ ggsave(
 )
 
 ggsave(
-  filename = file.path(figures_dir, "pca_biology_combat.png"),
+  filename = file.path(figures_dir, "pca_biology_combat_QC.png"),
   plot     = pca_biology_panel,
   width    = 14,
   height   = 6,
@@ -333,13 +334,32 @@ ggsave(
 
 # gráficos pca 3d interativos (antes e depois do combat)
 
+
+# Garantir ordem dos grupos para definir os símbolos
+df_pca_before$Group <- factor(
+  df_pca_before$Group,
+  levels = c("non_tumor", "tumor")
+)
+
+df_pca_after$Group <- factor(
+  df_pca_after$Group,
+  levels = c("non_tumor", "tumor")
+)
+
+
 # A) PCA 3D Antes do ComBat
 p_3d_before <- plot_ly(
   df_pca_before,
   x = ~PC1, y = ~PC2, z = ~PC3,
   color = ~Study,
   symbol = ~Group,
-  text = ~paste("Amostra:", metadata$sample_ID, "<br>Estudo:", Study, "<br>Grupo:", Group, "<br>Classe:", Class),
+  symbols = c("circle", "diamond"),
+  text = ~paste(
+    "Amostra:", metadata$sample_ID,
+    "<br>Estudo:", Study,
+    "<br>Grupo:", Group,
+    "<br>Classe:", Class
+  ),
   hoverinfo = "text",
   marker = list(size = 5)
 ) %>%
@@ -347,11 +367,18 @@ p_3d_before <- plot_ly(
   layout(
     title = "PCA 3D Antes do ComBat (Efeito de Lote Nítido)",
     scene = list(
-      xaxis = list(title = paste0("PC1 (", var_explained_before[1], "%)")),
-      yaxis = list(title = paste0("PC2 (", var_explained_before[2], "%)")),
-      zaxis = list(title = paste0("PC3 (", var_explained_before[3], "%)"))
+      xaxis = list(
+        title = paste0("PC1 (", var_explained_before[1], "%)")
+      ),
+      yaxis = list(
+        title = paste0("PC2 (", var_explained_before[2], "%)")
+      ),
+      zaxis = list(
+        title = paste0("PC3 (", var_explained_before[3], "%)")
+      )
     )
   )
+
 
 # B) PCA 3D Depois do ComBat
 p_3d_after <- plot_ly(
@@ -359,7 +386,13 @@ p_3d_after <- plot_ly(
   x = ~PC1, y = ~PC2, z = ~PC3,
   color = ~Study,
   symbol = ~Group,
-  text = ~paste("Amostra:", metadata$sample_ID, "<br>Estudo:", Study, "<br>Grupo:", Group, "<br>Classe:", Class),
+  symbols = c("circle", "diamond"),
+  text = ~paste(
+    "Amostra:", metadata$sample_ID,
+    "<br>Estudo:", Study,
+    "<br>Grupo:", Group,
+    "<br>Classe:", Class
+  ),
   hoverinfo = "text",
   marker = list(size = 5)
 ) %>%
@@ -367,15 +400,47 @@ p_3d_after <- plot_ly(
   layout(
     title = "PCA 3D Pós-ComBat (Remoção do Efeito de Lote)",
     scene = list(
-      xaxis = list(title = paste0("PC1 (", var_explained_after[1], "%)")),
-      yaxis = list(title = paste0("PC2 (", var_explained_after[2], "%)")),
-      zaxis = list(title = paste0("PC3 (", var_explained_after[3], "%)"))
+      xaxis = list(
+        title = paste0("PC1 (", var_explained_after[1], "%)")
+      ),
+      yaxis = list(
+        title = paste0("PC2 (", var_explained_after[2], "%)")
+      ),
+      zaxis = list(
+        title = paste0("PC3 (", var_explained_after[3], "%)")
+      )
     )
   )
 
+
 # Salvar ambos os HTMLs interativos
-saveWidget(p_3d_before, file = file.path(figures_dir, "pca_3d_pre_combat.html"), selfcontained = TRUE)
-saveWidget(p_3d_after,  file = file.path(figures_dir, "pca_3d_post_combat.html"), selfcontained = TRUE)
+saveWidget(p_3d_before, file = file.path(figures_dir, "pca_3d_pre_combat_QC.html"), selfcontained = TRUE)
+saveWidget(p_3d_after,  file = file.path(figures_dir, "pca_3d_post_combat_QC.html"), selfcontained = TRUE)
+
+# removendo arquivos temporários do PCA 3D
+remover_pasta_htmlwidgets <- function(html_file) {
+  pasta_files <- sub(
+    "\\.html$",
+    "_files",
+    html_file
+  )
+  if (dir.exists(pasta_files)) {
+    unlink(
+      pasta_files,
+      recursive = TRUE,
+      force = TRUE
+    )
+    message("Pasta removida: ", pasta_files)
+  }
+}
+
+remover_pasta_htmlwidgets(
+  file.path(figures_dir, "pca_3d_pre_combat.html")
+)
+
+remover_pasta_htmlwidgets(
+  file.path(figures_dir, "pca_3d_post_combat.html")
+)
 
 message("Gráficos de PCA (2D e 3D) exportados com sucesso em: ", figures_dir)
 
