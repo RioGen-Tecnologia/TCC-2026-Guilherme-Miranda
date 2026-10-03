@@ -94,6 +94,168 @@ norm_corrigido_GSE13507 <- norm_corrigido_GSE13507[ids, ]
 metadata <- metadata[ids, ]
 
 
+# ====== CONTROLE DE QUALIDADE DOS ARRAYS ======
+
+message("\n", paste(rep("=", 30), collapse = ""))
+message("Realizando controle de qualidade de ", id_projeto, "...")
+message(paste(rep("=", 30), collapse = ""))
+
+# Diretório para resultados de QC
+qc_dir <- file.path(processed_dir, id_projeto, "QC_2")
+
+if (!dir.exists(qc_dir)) {
+  dir.create(qc_dir, recursive = TRUE)
+}
+
+# ---------- RESUMO DA DISTRIBUIÇÃO DAS INTENSIDADES ----------
+
+id <- "GSE13507"
+
+qc_intensidade <- data.frame(
+  Sample = rownames(norm_corrigido_GSE13507),
+  Median = apply(
+    norm_corrigido_GSE13507,
+    1,
+    median,
+    na.rm = TRUE
+  ),
+  Q1 = apply(
+    norm_corrigido_GSE13507,
+    1,
+    quantile,
+    probs = 0.25,
+    na.rm = TRUE
+  ),
+  Q3 = apply(
+    norm_corrigido_GSE13507,
+    1,
+    quantile,
+    probs = 0.75,
+    na.rm = TRUE
+  )
+)
+
+qc_intensidade$IQR <-
+  qc_intensidade$Q3 - qc_intensidade$Q1
+
+qc_intensidade <- qc_intensidade[
+  order(qc_intensidade$Median),
+]
+
+print(qc_intensidade)
+
+# ---------- PCA ----------
+
+pca <- prcomp(
+  norm_corrigido_GSE13507,
+  center = TRUE,
+  scale. = FALSE
+)
+
+var_exp <- (pca$sdev^2 / sum(pca$sdev^2)) * 100
+
+pca_df <- data.frame(
+  Sample = rownames(pca$x),
+  PC1 = pca$x[, 1],
+  PC2 = pca$x[, 2]
+)
+
+pca_df$Group <- metadata[rownames(pca_df), "sample_type"]
+
+png(
+  file.path(qc_dir, "PCA_GSE13507_limpo.png"),
+  width = 1800,
+  height = 1400,
+  res = 150
+)
+
+cores <- as.numeric(as.factor(pca_df$Group))
+
+plot(
+  pca_df$PC1,
+  pca_df$PC2,
+  pch = 19,
+  col = cores,
+  xlab = paste0("PC1 (", round(var_exp[1], 2), "%)"),
+  ylab = paste0("PC2 (", round(var_exp[2], 2), "%)"),
+  main = "PCA - GSE13507"
+)
+
+legend(
+  "topright",
+  legend = levels(as.factor(pca_df$Group)),
+  col = seq_along(levels(as.factor(pca_df$Group))),
+  pch = 19,
+  bty = "n"
+)
+
+dev.off()
+
+# ---------- CORRELAÇÃO ENTRE AMOSTRAS ----------
+
+cor_mat <- cor(
+  t(norm_corrigido_GSE13507),
+  method = "pearson",
+  use = "pairwise.complete.obs"
+)
+
+png(
+  file.path(qc_dir, "Correlacao_GSE13507.png"),
+  width = 1800,
+  height = 1600,
+  res = 150
+)
+
+heatmap(
+  cor_mat,
+  symm = TRUE,
+  scale = "none",
+  margins = c(10, 10),
+  main = "Correlação de Pearson - GSE13507"
+)
+
+dev.off()
+
+mean_cor <- sapply(
+  1:nrow(cor_mat),
+  function(i) mean(cor_mat[i, -i], na.rm = TRUE)
+)
+
+mean_cor <- sort(mean_cor)
+
+mean_cor
+
+# ---------- HIERARCHICAL CLUSTERING ----------
+
+dist_mat <- dist(
+  norm_corrigido_GSE13507,
+  method = "euclidean"
+)
+
+hc <- hclust(
+  dist_mat,
+  method = "complete"
+)
+
+png(
+  file.path(qc_dir, "Hierarchical_GSE13507.png"),
+  width = 2200,
+  height = 1400,
+  res = 150
+)
+
+plot(
+  hc,
+  labels = rownames(norm_corrigido_GSE13507),
+  main = "Hierarchical clustering - GSE13507",
+  xlab = "",
+  sub = "",
+  cex = 0.55
+)
+
+dev.off()
+
+
 # ====== anotação com EntrezID ======
 
 # --- Etapa de anotação ---

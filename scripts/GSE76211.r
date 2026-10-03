@@ -65,6 +65,157 @@ cels.GSE76211 <- list.files(
 # Lendo os dados brutos (raw data)
 dados_brutos_GSE76211 <- oligo::read.celfiles(cels.GSE76211)
 
+
+# ====== CONTROLE DE QUALIDADE DOS ARRAYS ======
+
+# objeto para QC
+dados_QC_GSE76211 <- dados_brutos_GSE76211
+sampleNames(dados_QC_GSE76211) <- sub("_.*$","",sampleNames(dados_QC_GSE76211))
+
+message("\n", paste(rep("=", 30), collapse = ""))
+message("Realizando controle de qualidade de ", id_projeto, "...")
+message(paste(rep("=", 30), collapse = ""))
+
+medianas_arrays <- apply(
+  log2(Biobase::exprs(dados_QC_GSE76211)),
+  2,
+  median,
+  na.rm = TRUE
+)
+
+mediana_global <- median(
+  medianas_arrays,
+  na.rm = TRUE
+)
+
+# Diretório para resultados de QC
+qc_dir <- file.path(processed_dir, id_projeto, "QC_2")
+
+if (!dir.exists(qc_dir)) {
+  dir.create(qc_dir, recursive = TRUE)
+}
+
+# ---------- DISTRIBUIÇÃO DAS INTENSIDADES BRUTAS ----------
+
+png(
+  filename = file.path(qc_dir, "Intensidades_brutas_GSE76211.png"),
+  width = 1800,
+  height = 1200,
+  res = 150
+)
+
+boxplot(
+  dados_QC_GSE76211,
+  target = "core",
+  main = paste("Distribuição das intensidades brutas -", id_projeto),
+  ylab = "Log2(intensidade)",
+  las = 2,
+  outline = FALSE
+)
+abline(
+  h = mediana_global,
+  lty = 2,
+  col = "black",
+  lwd = 1.5
+)
+
+dev.off()
+
+
+# ====== INVESTIGAÇÃO ADICIONAL DE QUALIDADE ======
+
+message("\n", paste(rep("=", 30), collapse = ""))
+message("Gerando análises adicionais de QC...")
+message(paste(rep("=", 30), collapse = ""))
+
+# ---------- PCA DAS INTENSIDADES BRUTAS ----------
+exprs_log2_GSE76211 <- log2(Biobase::exprs(dados_QC_GSE76211))
+
+pca_GSE76211 <- prcomp(
+  t(exprs_log2_GSE76211),
+  center = TRUE,
+  scale. = FALSE
+)
+
+# Variância explicada
+var_pca_GSE76211 <- pca_GSE76211$sdev^2
+var_pca_GSE76211 <- var_pca_GSE76211 / sum(var_pca_GSE76211) * 100
+
+
+png(filename = file.path(qc_dir,"PCA_GSE76211.png"),
+    width = 1800,
+    height = 1400,
+    res = 150)
+plot(
+  pca_GSE76211$x[, 1],
+  pca_GSE76211$x[, 2],
+  pch = 19,
+  xlab = paste0(
+    "PC1 (",
+    round(var_pca_GSE76211[1], 2),
+    "%)"
+  ),
+  ylab = paste0(
+    "PC2 (",
+    round(var_pca_GSE76211[2], 2),
+    "%)"
+  ),
+  main = paste(
+    "PCA das intensidades brutas -",
+    id_projeto
+  )
+)
+
+text(
+  pca_GSE76211$x[, 1],
+  pca_GSE76211$x[, 2],
+  labels = colnames(dados_QC_GSE76211),
+  pos = 3,
+  cex = 0.55
+)
+dev.off()
+
+
+# ---------- CORRELAÇÃO ENTRE ARRAYS ----------
+cor_GSE76211 <- cor(
+  exprs_log2_GSE76211,
+  method = "pearson",
+  use = "pairwise.complete.obs")
+
+png(filename = file.path(qc_dir,"Correlacao_arrays_GSE76211.png"),width = 1800,height = 1600,res = 150)
+heatmap(
+  cor_GSE76211,
+  Rowv = NA,
+  Colv = NA,
+  scale = "none",
+  symm = TRUE,
+  margins = c(10, 10),
+  main = paste(
+    "Correlação entre arrays -",
+    id_projeto
+  )
+)
+dev.off()
+
+# ---------- DISTÂNCIA ENTRE ARRAYS ----------
+dist_GSE76211 <- dist(t(exprs_log2_GSE76211))
+
+png(filename = file.path(qc_dir,"Cluster_arrays_GSE76211.png"),width = 1800,height = 1400,res = 150)
+
+plot(
+  hclust(dist_GSE76211),
+  main = paste(
+    "Agrupamento hierárquico dos arrays -",
+    id_projeto
+  ),
+  xlab = "",
+  sub = "",
+  cex = 0.6
+)
+
+dev.off()
+
+
 # ====== Normalização dos dados ======
 
 # --- Etapa de Normalização ---

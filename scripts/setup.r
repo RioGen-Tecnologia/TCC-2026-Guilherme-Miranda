@@ -11,10 +11,10 @@ library(hgu133plus2.db) #pacote de base de anotação
 library(hta20transcriptcluster.db) #pacote de base de anotação
 library(hgu133a.db) #pacote de base de anotação
 library(hgu133acdf) #pacote de base de anotação
-library(hgu133plus2cdf) #pacote de base de anotação
+library(hgu133acdf) #pacote de base de anotação
 library(illuminaHumanv2.db) #pacote de base de anotação
 library(illuminaHumanv4.db) #pacote de base de anotação
-library(pbapply) # pacote para barra de progresso e exec
+library(affyPLM) # controle de qualidade de arrays affy
 library(ggplot2) #pacote de gráficos de expressão
 library(dplyr) #gerenciamento de dataframes
 library(tibble) #gerenciamento de dataframes

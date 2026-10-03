@@ -64,6 +64,78 @@ cels.GSE7476 <- list.files(
 # Lendo os dados brutos (raw data)
 dados_brutos_GSE7476 <- ReadAffy(filenames=cels.GSE7476)
 
+
+# ====== CONTROLE DE QUALIDADE DOS ARRAYS ======
+
+message("\n", paste(rep("=", 30), collapse = ""))
+message("Realizando controle de qualidade de ", id_projeto, "...")
+message(paste(rep("=", 30), collapse = ""))
+
+# Ajuste do modelo probe-level
+plm_GSE7476 <- affyPLM::fitPLM(dados_brutos_GSE7476)
+
+# Diretório para resultados de QC
+qc_dir <- file.path(processed_dir, id_projeto, "QC_2")
+
+if (!dir.exists(qc_dir)) {
+  dir.create(qc_dir, recursive = TRUE)
+}
+
+# ---------- RLE ----------
+
+png(
+  filename = file.path(qc_dir, "RLE_GSE7476.png"),
+  width = 1800,
+  height = 1200,
+  res = 150
+)
+
+Mbox(
+  plm_GSE7476,
+  main = paste("RLE -", id_projeto),
+  las = 2
+)
+
+dev.off()
+
+
+# ---------- NUSE ----------
+
+png(
+  filename = file.path(qc_dir, "NUSE_GSE3167.png"),
+  width = 1800,
+  height = 1200,
+  res = 150
+)
+
+affyPLM::NUSE(
+  plm_GSE7476,
+  main = paste("NUSE -", id_projeto),
+  las = 2
+)
+
+dev.off()
+
+# ---------- DISTRIBUIÇÃO DAS INTENSIDADES BRUTAS ----------
+
+png(
+  filename = file.path(qc_dir, "Intensidades_brutas_GSE7476.png"),
+  width = 1800,
+  height = 1200,
+  res = 150
+)
+
+boxplot(
+  dados_brutos_GSE7476,
+  main = paste("Distribuição das intensidades brutas -", id_projeto),
+  ylab = "Intensidade de fluorescência",
+  las = 2,
+  outline = FALSE
+)
+
+dev.off()
+
+
 # ====== Normalização dos dados ======
 
 # --- Etapa de Normalização ---

@@ -13,7 +13,7 @@ library(affy)
 library(limma)
 library(AnnotationDbi)
 library(hgu133a.db)
-library(hgu133plus2cdf)
+library(hgu133acdf)
 
 # ============== EXTRAÇÃO DE DADOS ==============
 
@@ -62,6 +62,201 @@ cels.GSE3167 <- list.files(
 
 # Lendo os dados brutos (raw data)
 dados_brutos_GSE3167 <- ReadAffy(filenames=cels.GSE3167)
+
+
+# ====== CONTROLE DE QUALIDADE DOS ARRAYS ======
+
+message("\n", paste(rep("=", 30), collapse = ""))
+message("Realizando controle de qualidade de ", id_projeto, "...")
+message(paste(rep("=", 30), collapse = ""))
+
+# Ajuste do modelo probe-level
+plm_GSE3167 <- affyPLM::fitPLM(dados_brutos_GSE3167)
+
+medianas_arrays <- apply(
+  log2(Biobase::exprs(dados_brutos_GSE3167)),
+  2,
+  median,
+  na.rm = TRUE
+)
+
+mediana_global <- median(
+  medianas_arrays,
+  na.rm = TRUE
+)
+
+# Diretório para resultados de QC
+qc_dir <- file.path(processed_dir, id_projeto, "QC_2")
+
+if (!dir.exists(qc_dir)) {
+  dir.create(qc_dir, recursive = TRUE)
+}
+
+# ---------- RLE ----------
+
+png(
+  filename = file.path(qc_dir, "RLE_GSE3167.png"),
+  width = 1800,
+  height = 1200,
+  res = 150
+)
+
+Mbox(
+  plm_GSE3167,
+  main = paste("RLE -", id_projeto),
+  las = 2
+)
+abline(h = 0, lty = 2, col = "black", lwd = 1.5)
+
+dev.off()
+
+# ---------- NUSE ----------
+
+png(
+  filename = file.path(qc_dir, "NUSE_GSE3167.png"),
+  width = 1800,
+  height = 1200,
+  res = 150
+)
+
+affyPLM::NUSE(
+  plm_GSE3167,
+  main = paste("NUSE -", id_projeto),
+  las = 2
+)
+
+dev.off()
+
+# ---------- DISTRIBUIÇÃO DAS INTENSIDADES BRUTAS ----------
+
+png(
+  filename = file.path(qc_dir, "Intensidades_brutas_GSE3167.png"),
+  width = 1800,
+  height = 1200,
+  res = 150
+)
+
+boxplot(
+  dados_brutos_GSE3167,
+  main = paste("Distribuição das intensidades brutas -", id_projeto),
+  ylab = "Log2(intensidade)",
+  las = 2,
+  outline = FALSE
+)
+
+abline(
+  h = mediana_global,
+  lty = 2,
+  col = "black",
+  lwd = 1.5
+)
+
+dev.off()
+
+
+# ====== INVESTIGAÇÃO ADICIONAL DE QUALIDADE ======
+
+message("\n", paste(rep("=", 30), collapse = ""))
+message("Gerando análises adicionais de QC...")
+message(paste(rep("=", 30), collapse = ""))
+
+# ---------- RNA DEGRADATION ----------
+rna_deg_GSE3167 <- AffyRNAdeg(dados_brutos_GSE3167)
+
+png(filename = file.path(qc_dir,"RNA_degradation_GSE3167.png"),
+  width = 1800,
+  height = 1200,
+  res = 150)
+plotAffyRNAdeg(rna_deg_GSE3167)
+dev.off()
+
+# ---------- PCA DAS INTENSIDADES BRUTAS ----------
+exprs_log2_GSE3167 <- log2(Biobase::exprs(dados_brutos_GSE3167))
+
+pca_GSE3167 <- prcomp(
+  t(exprs_log2_GSE3167),
+  center = TRUE,
+  scale. = FALSE
+)
+
+# Variância explicada
+var_pca_GSE3167 <- pca_GSE3167$sdev^2
+var_pca_GSE3167 <- var_pca_GSE3167 / sum(var_pca_GSE3167) * 100
+
+
+png(filename = file.path(qc_dir,"PCA_GSE3167.png"),
+  width = 1800,
+  height = 1400,
+  res = 150)
+plot(
+  pca_GSE3167$x[, 1],
+  pca_GSE3167$x[, 2],
+  pch = 19,
+  xlab = paste0(
+    "PC1 (",
+    round(var_pca_GSE3167[1], 2),
+    "%)"
+  ),
+  ylab = paste0(
+    "PC2 (",
+    round(var_pca_GSE3167[2], 2),
+    "%)"
+  ),
+  main = paste(
+    "PCA das intensidades brutas -",
+    id_projeto
+  )
+)
+
+text(
+  pca_GSE3167$x[, 1],
+  pca_GSE3167$x[, 2],
+  labels = colnames(dados_brutos_GSE3167),
+  pos = 3,
+  cex = 0.55
+)
+dev.off()
+
+
+# ---------- CORRELAÇÃO ENTRE ARRAYS ----------
+cor_GSE3167 <- cor(
+  exprs_log2_GSE3167,
+  method = "pearson",
+  use = "pairwise.complete.obs")
+
+png(filename = file.path(qc_dir,"Correlacao_arrays_GSE3167.png"),width = 1800,height = 1600,res = 150)
+heatmap(
+  cor_GSE3167,
+  Rowv = NA,
+  Colv = NA,
+  scale = "none",
+  symm = TRUE,
+  margins = c(10, 10),
+  main = paste(
+    "Correlação entre arrays -",
+    id_projeto
+  )
+)
+dev.off()
+
+# ---------- DISTÂNCIA ENTRE ARRAYS ----------
+dist_GSE3167 <- dist(t(exprs_log2_GSE3167))
+
+png(filename = file.path(qc_dir,"Cluster_arrays_GSE3167.png"),width = 1800,height = 1400,res = 150)
+
+plot(
+  hclust(dist_GSE3167),
+  main = paste(
+    "Agrupamento hierárquico dos arrays -",
+    id_projeto
+  ),
+  xlab = "",
+  sub = "",
+  cex = 0.6
+)
+
+dev.off()
+
 
 # ====== Normalização dos dados ======
 
