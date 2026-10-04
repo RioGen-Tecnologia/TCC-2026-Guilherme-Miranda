@@ -53,6 +53,9 @@ message("\n", paste(rep("=", 30), collapse = ""))
 message("Lendo dados para ", id_projeto, "...")
 message(paste(rep("=", 30), collapse = ""))
 
+## remove a amostra outlier identificada no QC!!!!
+file.remove(file.path(projeto_dir, "GSM71027.CEL.gz"))
+
 # Cria uma variável com arquivos que possuem "CEL.gz" e os imprime (exclue os CHP.gz)
 cels.GSE3167 <- list.files(
   path = projeto_dir,

@@ -36,7 +36,7 @@ for (d in dirs) {
 # Master Manifesto com anotações das amostras
 metadata_path <- list.files(
   here("metadata"),
-  pattern = "bladder_cancer_metadata_amostras_filtradas_QC.csv",
+  pattern = "bladder_cancer_metadata_amostras_filtradas_QC_por_dataset.csv",
   full.names = TRUE
 )
 
@@ -417,32 +417,15 @@ p_3d_after <- plot_ly(
 saveWidget(p_3d_before, file = file.path(figures_dir, "pca_3d_pre_combat_QC.html"), selfcontained = TRUE)
 saveWidget(p_3d_after,  file = file.path(figures_dir, "pca_3d_post_combat_QC.html"), selfcontained = TRUE)
 
-# removendo arquivos temporários do PCA 3D
-remover_pasta_htmlwidgets <- function(html_file) {
-  pasta_files <- sub(
-    "\\.html$",
-    "_files",
-    html_file
-  )
-  if (dir.exists(pasta_files)) {
-    unlink(
-      pasta_files,
-      recursive = TRUE,
-      force = TRUE
-    )
-    message("Pasta removida: ", pasta_files)
-  }
-}
-
-remover_pasta_htmlwidgets(
-  file.path(figures_dir, "pca_3d_pre_combat.html")
+# Remover pastas temporárias geradas pelos widgets
+unlink(
+  file.path(figures_dir, c(
+    "pca_3d_pre_combat_QC_files",
+    "pca_3d_post_combat_QC_files"
+  )),
+  recursive = TRUE,
+  force = TRUE
 )
-
-remover_pasta_htmlwidgets(
-  file.path(figures_dir, "pca_3d_post_combat.html")
-)
-
-message("Gráficos de PCA (2D e 3D) exportados com sucesso em: ", figures_dir)
 
 # Limpeza de memória
 rm(
@@ -1832,3 +1815,229 @@ message(
 
 print(resultado_final)
 
+
+# ============== HEATMAP FINAL — 13 CANDIDATOS ==============
+
+# organizando genes finais
+genes_finais <- as.character(resultado_final$EntrezID)
+symbols_finais <- as.character(resultado_final$GeneSymbol)
+
+names(symbols_finais) <- genes_finais
+
+print(data.frame(
+  EntrezID = genes_finais,
+  GeneSymbol = symbols_finais
+))
+
+
+## HEATMAP — DESCOBERTA
+
+# Verificar quais genes estão presentes
+genes_descoberta <- intersect(genes_finais,rownames(expr_combat))
+
+if (length(genes_descoberta) < length(genes_finais)) {
+  
+  message("Genes ausentes na descoberta: ",
+    paste(setdiff(genes_finais, genes_descoberta),collapse = ", "))}
+if (length(genes_descoberta) < 2) {stop("Menos de 2 genes finais encontrados na matriz de descoberta.")}
+
+# Manter a ordem original dos genes finais
+genes_descoberta <- genes_finais[genes_finais %in% genes_descoberta]
+
+# Extrair expressão
+matriz_descoberta <- expr_combat[genes_descoberta,
+  ,drop = FALSE]
+
+# Z-score por gene
+matriz_descoberta_z <- t(scale(t(matriz_descoberta)))
+
+# Remover genes que eventualmente tenham variância zero
+matriz_descoberta_z <- matriz_descoberta_z[complete.cases(matriz_descoberta_z),
+  ,drop = FALSE]
+
+# Substituir Entrez pelos símbolos
+symbols_descoberta <- symbols_finais[rownames(matriz_descoberta_z)]
+
+symbols_descoberta[
+  is.na(symbols_descoberta) |
+    symbols_descoberta == ""
+] <- rownames(matriz_descoberta_z
+)[is.na(symbols_descoberta) |
+    symbols_descoberta == ""]
+rownames(matriz_descoberta_z) <- make.unique(symbols_descoberta)
+
+
+# alinhando metadados de descoberta
+# Identificar os IDs das amostras na matriz
+if (exists("metadata_alinhado")) {metadata_heatmap_desc <- metadata_alinhado
+  if (
+    "sample_ID" %in% colnames(metadata_heatmap_desc) &&
+    all(metadata_heatmap_desc$sample_ID %in% colnames(matriz_descoberta_z))
+  ) {
+    metadata_heatmap_desc$matrix_id <- metadata_heatmap_desc$sample_ID
+  } else {metadata_heatmap_desc$matrix_id <- paste0(metadata_heatmap_desc$study_ID,"_",metadata_heatmap_desc$sample_ID)
+  }
+} else {stop("O objeto 'metadata_alinhado' não está disponível.")}
+
+# Manter somente amostras presentes na matriz
+metadata_heatmap_desc <-metadata_heatmap_desc[metadata_heatmap_desc$matrix_id %in% colnames(matriz_descoberta_z),
+    ,drop = FALSE]
+
+# Ordenar biologicamente
+ordem_desc <- order(metadata_heatmap_desc$sample_type)
+
+metadata_heatmap_desc <- metadata_heatmap_desc[ordem_desc, , drop = FALSE]
+
+# Manter somente as amostras presentes em ambos
+amostras_desc <- intersect(metadata_heatmap_desc$matrix_id,colnames(matriz_descoberta_z))
+
+metadata_heatmap_desc <- metadata_heatmap_desc[metadata_heatmap_desc$matrix_id %in% amostras_desc,
+    ,drop = FALSE]
+
+# Reordenar a matriz de acordo com o metadata
+matriz_descoberta_z <-matriz_descoberta_z[,metadata_heatmap_desc$matrix_id,drop = FALSE]
+
+# anotações de descoberta
+anotacoes_desc <- data.frame(
+  Tipo = metadata_heatmap_desc$sample_type,
+  Estudo = metadata_heatmap_desc$study_ID,
+  row.names = colnames(matriz_descoberta_z))
+
+
+# salvando heatmap de descoberta
+
+arquivo_descoberta <- file.path(
+  figures_dir,
+  "heatmap_13_candidatos_descoberta.png"
+)
+
+png(
+  filename = arquivo_descoberta,
+  width = 3000,
+  height = 2200,
+  res = 300
+)
+
+pheatmap(
+  matriz_descoberta_z,
+  annotation_col = anotacoes_desc,
+  show_colnames = FALSE,
+  show_rownames = TRUE,
+  fontsize_row = 10,
+  cluster_rows = TRUE,
+  cluster_cols = FALSE,
+  main = "13 candidatos finais — Descoberta",
+  border_color = NA
+)
+
+dev.off()
+
+
+## HEATMAP — VALIDAÇÃO recount3
+
+# Verificar genes presentes
+genes_validacao <- intersect(
+  genes_finais,
+  rownames(validation_exprs)
+)
+
+if (length(genes_validacao) < length(genes_finais)) {
+  
+  message(
+    "Genes ausentes na validação: ",
+    paste(
+      setdiff(genes_finais, genes_validacao),
+      collapse = ", "
+    )
+  )
+}
+
+if (length(genes_validacao) < 2) {
+  stop("Menos de 2 genes finais encontrados na validação.")
+}
+
+# Manter ordem original
+genes_validacao <- genes_finais[
+  genes_finais %in% genes_validacao]
+
+# Extrair expressão
+matriz_validacao <- validation_exprs[
+  genes_validacao,
+  ,drop = FALSE]
+
+# Z-score independente dentro da validação
+matriz_validacao_z <- t(
+  scale(t(matriz_validacao)))
+
+# Remover genes sem variância
+matriz_validacao_z <- matriz_validacao_z[
+  complete.cases(matriz_validacao_z),
+  ,drop = FALSE]
+
+# Usar símbolos
+symbols_validacao <- symbols_finais[
+  rownames(matriz_validacao_z)
+]
+
+symbols_validacao[
+  is.na(symbols_validacao) |
+    symbols_validacao == ""
+] <- rownames(
+  matriz_validacao_z
+)[
+  is.na(symbols_validacao) |
+    symbols_validacao == ""
+]
+
+rownames(matriz_validacao_z) <- make.unique(symbols_validacao)
+
+
+# organizando metadados de validação
+# group_roc já está alinhado com validation_exprs
+if (length(group_roc) != ncol(matriz_validacao_z)) {
+  stop("group_roc não possui o mesmo número de amostras da validação.")}
+
+# Criar metadata
+metadata_heatmap_val <- data.frame(
+  Tipo = group_roc,row.names = colnames(matriz_validacao_z))
+
+# Ordenar: não-tumor primeiro, tumor depois
+ordem_val <- order(metadata_heatmap_val$Tipo)
+
+metadata_heatmap_val <-
+  metadata_heatmap_val[
+    ordem_val,
+    ,
+    drop = FALSE
+  ]
+
+# Reordenar matriz
+matriz_validacao_z <- matriz_validacao_z[,rownames(metadata_heatmap_val),drop = FALSE]
+
+# salvando heatmap de validação
+
+arquivo_validacao <- file.path(
+  figures_dir,
+  "heatmap_13_candidatos_validacao.png"
+)
+
+png(
+  filename = arquivo_validacao,
+  width = 4000,
+  height = 2200,
+  res = 300
+)
+
+pheatmap(
+  matriz_validacao_z,
+  annotation_col = metadata_heatmap_val,
+  show_colnames = FALSE,
+  show_rownames = TRUE,
+  fontsize_row = 10,
+  cluster_rows = TRUE,
+  cluster_cols = FALSE,
+  main = "13 candidatos finais — Validação",
+  border_color = NA
+)
+
+dev.off()
