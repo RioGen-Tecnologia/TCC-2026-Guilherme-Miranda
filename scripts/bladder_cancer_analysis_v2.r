@@ -839,7 +839,7 @@ gc()
 # uma validação externa independente.
 
 
-## 1. PREPARAÇÃO DA MATRIZ DE EXPRESSÃO=======================
+## PREPARAÇÃO DA MATRIZ DE EXPRESSÃO
 
 # O glmnet espera:
 #   linhas  = amostras
@@ -1320,20 +1320,14 @@ dev.off()
 rm(roc_df,gene,values,roc_curve)
 gc()
 
-
-# ============================================================
-# REDE DE INTERAÇÃO PROTEÍNA-PROTEÍNA (PPI)
+# ============== REDE DE INTERAÇÃO PROTEÍNA-PROTEÍNA (PPI) ==============
 # STRING + DEGs + destaque dos candidatos finais
-# ============================================================
 
 message("\n", paste(rep("=", 50), collapse = ""))
 message("Construindo rede PPI")
 message(paste(rep("=", 50), collapse = ""))
 
-
-# ------------------------------------------------------------
-# 1. Preparação dos genes
-# ------------------------------------------------------------
+## Preparação dos genes
 
 # Todos os DEGs da análise principal
 genes_ppi <- unique(as.character(DEGs$EntrezID))
@@ -1354,10 +1348,7 @@ genes_candidatos <- genes_candidatos[!is.na(genes_candidatos)]
 message("DEGs para a rede: ", length(genes_ppi))
 message("Candidatos finais: ", length(genes_candidatos))
 
-
-# ------------------------------------------------------------
-# 2. Conectar ao STRING
-# ------------------------------------------------------------
+## Conectando ao STRING
 
 string_db <- STRINGdb$new(
   version = "12.0",
@@ -1366,10 +1357,7 @@ string_db <- STRINGdb$new(
   input_directory = ""
 )
 
-
-# ------------------------------------------------------------
-# 3. Mapear Entrez IDs para STRING IDs
-# ------------------------------------------------------------
+## Mapeando Entrez IDs para STRING IDs
 
 genes_df <- data.frame(
   ENTREZID = genes_ppi,
@@ -1394,10 +1382,7 @@ message(
   nrow(mapped_candidates)
 )
 
-
-# ------------------------------------------------------------
-# 4. Obter interações entre os DEGs
-# ------------------------------------------------------------
+## Obtendo interações entre os DEGs
 
 interactions <- string_db$get_interactions(
   mapped_genes$STRING_id
@@ -1415,9 +1400,7 @@ interactions <- interactions[
 message("Interações encontradas: ", nrow(interactions))
 
 
-# ------------------------------------------------------------
-# 5. Converter STRING IDs novamente para Entrez IDs
-# ------------------------------------------------------------
+## Convertendo STRING IDs novamente para Entrez IDs
 
 id_map <- mapped_genes[, c("STRING_id", "ENTREZID")]
 
@@ -1441,10 +1424,7 @@ interactions <- merge(
 
 names(interactions)[names(interactions) == "ENTREZID"] <- "ENTREZID_to"
 
-
-# ------------------------------------------------------------
-# 6. Criar tabela de nós
-# ------------------------------------------------------------
+## Criando tabela de nós
 
 nodes <- data.frame(
   name = mapped_genes$ENTREZID,
@@ -1468,9 +1448,7 @@ nodes$FDR <- resultados_limma$adj.P.Val[
 nodes$Candidato <- nodes$ENTREZID %in% genes_candidatos
 
 
-# ------------------------------------------------------------
-# 7. Criar tabela de arestas
-# ------------------------------------------------------------
+## Criando tabela de arestas
 
 edges <- interactions[, c(
   "ENTREZID_from",
@@ -1483,9 +1461,7 @@ names(edges) <- c("from", "to", "score")
 edges <- unique(edges)
 
 
-# ------------------------------------------------------------
-# 8. Criar objeto igraph
-# ------------------------------------------------------------
+## Criando objeto igraph
 
 ppi_graph <- graph_from_data_frame(
   d = edges,
@@ -1497,9 +1473,7 @@ message("Nós no grafo: ", vcount(ppi_graph))
 message("Arestas no grafo: ", ecount(ppi_graph))
 
 
-# ------------------------------------------------------------
-# 9. CONFIGURAÇÃO DA REDE
-# ------------------------------------------------------------
+## CONFIGURAÇÃO DA REDE
 
 # Grau de cada gene = número de interações na rede
 V(ppi_graph)$degree <- degree(ppi_graph)
@@ -1537,9 +1511,7 @@ E(ppi_graph)$color <- "gray80"
 E(ppi_graph)$width <- 0.5
 
 
-# ------------------------------------------------------------
-# 10. LAYOUT DA REDE
-# ------------------------------------------------------------
+## LAYOUT DA REDE
 
 set.seed(123)
 
@@ -1558,9 +1530,7 @@ layout_ppi <- norm_coords(
 )
 
 
-# ------------------------------------------------------------
-# 11. EXPORTAÇÃO DA REDE
-# ------------------------------------------------------------
+## EXPORTAÇÃO DO GRÁFICO DE REDE
 
 png(
   filename = file.path(
@@ -1606,9 +1576,7 @@ plot(
 dev.off()
 
 
-# ------------------------------------------------------------
-# 12. Exportar tabelas para Cytoscape
-# ------------------------------------------------------------
+## ExportaNDO tabelas para Cytoscape
 
 write.csv(
   nodes,
@@ -1628,10 +1596,7 @@ write.csv(
   row.names = FALSE
 )
 
-
-# ------------------------------------------------------------
-# 13. Resumo
-# ------------------------------------------------------------
+# Resumo
 
 message("\nRede PPI concluída.")
 message("Nós: ", vcount(ppi_graph))
@@ -1641,11 +1606,7 @@ message(
   sum(V(ppi_graph)$Candidato)
 )
 
-
-# ------------------------------------------------------------
-# 15. Limpeza
-# ------------------------------------------------------------
-
+# limpeza
 rm(
   genes_ppi, genes_candidatos, genes_df, mapped_genes,
   mapped_candidates, string_ids, id_map, nodes, edges,
@@ -1655,19 +1616,13 @@ rm(
 gc()
 
 
-
-# ============================================================
-# RESULTADO FINAL — CANDIDATOS A BIOMARCADORES
-# ============================================================
+# ============== RESULTADO FINAL — CANDIDATOS A BIOMARCADORES ==============
 
 message("\n", paste(rep("=", 50), collapse = ""))
 message("Gerando tabela final de candidatos a biomarcadores")
 message(paste(rep("=", 50), collapse = ""))
 
-
-# ------------------------------------------------------------
-# 1. Selecionar os 15 candidatos finais
-# ------------------------------------------------------------
+# Selecionando os 15 candidatos finais
 
 candidatos_finais <- genes_selecionados[
   genes_selecionados$DEG_limma == TRUE,
@@ -1677,10 +1632,7 @@ candidatos_finais <- candidatos_finais[
   order(candidatos_finais$FDR),
 ]
 
-
-# ------------------------------------------------------------
-# 2. Adicionar resultados da validação externa
-# ------------------------------------------------------------
+# Adicionando resultados da validação externa
 
 # Resultados de expressão diferencial no recount3
 validacao_expr <- validation_results[
@@ -1703,9 +1655,7 @@ validacao_auc$EntrezID <- as.character(validacao_auc$gene)
 validacao_auc <- validacao_auc[, c("EntrezID", "auc")]
 
 
-# ------------------------------------------------------------
-# 3. Preparar resultados da análise principal
-# ------------------------------------------------------------
+# Preparar resultados da análise principal
 
 candidatos_finais$logFC_principal <- candidatos_finais$logFC
 candidatos_finais$FDR_principal <- candidatos_finais$FDR
@@ -1714,9 +1664,7 @@ candidatos_finais$logFC <- NULL
 candidatos_finais$FDR <- NULL
 
 
-# ------------------------------------------------------------
-# 4. Combinar os resultados
-# ------------------------------------------------------------
+# Combinar os resultados
 
 resultado_final <- merge(
   candidatos_finais,
@@ -1733,9 +1681,7 @@ resultado_final <- merge(
 )
 
 
-# ------------------------------------------------------------
-# 5. Verificar concordância da expressão & Verificar se os candidatos são DEGs na validação
-# ------------------------------------------------------------
+# Verificar concordância da expressão & Verificar se os candidatos são DEGs na validação
 
 resultado_final$DEG_validacao <- (
   abs(resultado_final$logFC_validacao) > 1 &
@@ -1749,9 +1695,7 @@ resultado_final$direcao_concordante <- sign(
 )
 
 
-# ------------------------------------------------------------
-# 6. Organizar as colunas
-# ------------------------------------------------------------
+# Organizar as colunas
 
 resultado_final <- resultado_final[
   , c(
@@ -1769,9 +1713,7 @@ resultado_final <- resultado_final[
   )
 ]
 
-# ------------------------------------------------------------
-# 7. Exportar resultado final
-# ------------------------------------------------------------
+# Exportar resultado final
 
 final_dir <- file.path(results_dir, "final_candidates")
 dir.create(final_dir, showWarnings = FALSE, recursive = TRUE)
@@ -1789,10 +1731,7 @@ message("Número de candidatos: ", nrow(resultado_final))
 print(resultado_final)
 
 
-# ------------------------------------------------------------
-# 8. Resumo
-# ------------------------------------------------------------
-
+# Resumo
 message("\nTabela final gerada:")
 message(
   file.path(
