@@ -1202,7 +1202,7 @@ gc()
 
 
 
-# ============== Validação no TCGA ==============
+# ============== VALIDAÇÃO NO TCGA ==============
 # aqui é feito uma análise diferencial de dados padronizados de RNA-seq da base de
 # dados Recount3 que possui amostras BLCA tumorais do TCGA e amostras não-tumorais
 # de bexiga do GTex padronizadas por monorail. Os dados pré-processados foram
