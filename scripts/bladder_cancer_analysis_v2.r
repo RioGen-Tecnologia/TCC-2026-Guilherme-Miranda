@@ -1195,6 +1195,12 @@ resultados_modelo
 # Exportar os resultados
 write.csv(resultados_modelo,file.path(results_dir,"machine_learning","desempenho_elastic_net.csv"),row.names = FALSE)
 
+# Salvar o modelo Elastic Net em um arquivo RDS
+saveRDS(
+  object = modelo_enet, 
+  file = file.path(results_dir, "machine_learning", "modelo_elastic_net.rds")
+)
+
 # liberar memória
 rm(X,y,indices_treino,X_train,X_test,y_train,y_test,coef_enet,prob_tumor,
    roc_modelo,ponto_corte,threshold,classe_predita,matriz_confusao)
