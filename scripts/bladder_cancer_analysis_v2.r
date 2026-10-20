@@ -502,6 +502,7 @@ DEGs_down <- resultados_limma[
 
 
 # Exportar os resultados em CSV
+dir.create(file.path(results_dir, "limma"), recursive = TRUE, showWarnings = FALSE)
 write.csv(resultados_limma, file.path(results_dir, "limma/limma_tabela_completa.csv"), row.names = FALSE)
 write.csv(DEGs, file.path(results_dir, "limma/limma_DEGs.csv"), row.names = FALSE)
 write.csv(DEGs_up, file.path(results_dir, "limma/limma_DEGs_Upregulated.csv"), row.names = FALSE)
@@ -897,7 +898,6 @@ stopifnot(
 # aproximadamente, a proporção de tumores e não-tumores
 # nos dois conjuntos.
 
-set.seed(123)
 
 indices_treino <- createDataPartition(
   y = factor(y),
@@ -953,8 +953,6 @@ table(y_test)
 # standardize = TRUE padroniza as variáveis antes do ajuste,
 # procedimento particularmente importante quando as variáveis
 # apresentam escalas diferentes.
-
-set.seed(123)
 
 modelo_enet <- cv.glmnet(
   x = X_train,
@@ -1519,8 +1517,6 @@ E(ppi_graph)$width <- 0.5
 
 ## LAYOUT DA REDE
 
-set.seed(123)
-
 layout_ppi <- layout_with_fr(
   ppi_graph,
   weights = E(ppi_graph)$score / 1000
@@ -1583,6 +1579,7 @@ dev.off()
 
 
 ## ExportaNDO tabelas para Cytoscape
+dir.create(file.path(results_dir, "PPI"), recursive = TRUE, showWarnings = FALSE)
 
 write.csv(
   nodes,

@@ -1,0 +1,9 @@
+Os metadados não só trazem informações importantes sobre as amostras mas também seleciona quais entrarão na análise
+
+bladder_cancer_metadata.csv <- metados originais
+
+bladder_cancer_metadata_sem_amostras_GSE37817.csv <- metadados sem dataset GSE37817 que foi excluído por ser um sub-dataset
+
+bladder_cancer_metadata_amostras_filtradas_QC.csv <- netadados após remoção de amostras com ruído técnico observados no PCA antes e depois da integração ComBat
+
+bladder_cancer_metadata_amostras_filtradas_QC_por_dataset.csv <- metadados após filtragem de controle de qualidade dos arrays de cada dataset
