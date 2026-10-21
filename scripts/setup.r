@@ -12,6 +12,7 @@ library(hta20transcriptcluster.db) #pacote de base de anotação
 library(hgu133a.db) #pacote de base de anotação
 library(hgu133acdf) #pacote de base de anotação
 library(hgu133acdf) #pacote de base de anotação
+library(pd.hta.2.0)
 library(illuminaHumanv2.db) #pacote de base de anotação
 library(illuminaHumanv4.db) #pacote de base de anotação
 library(affyPLM) # controle de qualidade de arrays affy
