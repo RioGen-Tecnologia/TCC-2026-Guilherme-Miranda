@@ -1,2 +1,2 @@
 "AUC","Threshold","Sensibilidade","Especificidade","Acuracia","Balanced_Accuracy","Genes_Selecionados","Genes_DEG_Limma"
-0.991304347826087,0.803643766279442,0.978260869565217,1,0.980392156862745,0.989130434782609,35,12
+1,0.576318457214295,1,1,1,1,41,14

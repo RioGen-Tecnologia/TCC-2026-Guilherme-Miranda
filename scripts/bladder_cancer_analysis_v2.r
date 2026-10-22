@@ -898,6 +898,7 @@ stopifnot(
 # aproximadamente, a proporção de tumores e não-tumores
 # nos dois conjuntos.
 
+set.seed(123)
 
 indices_treino <- createDataPartition(
   y = factor(y),
