@@ -195,9 +195,6 @@ library(pROC)
 library(caret)
 library(glmnet)
 
-# Carregar o modelo e os arquivos salvos anteriormente (caso já não estejam no ambiente)
-modelo_enet <- readRDS(here("results", "machine_learning", "modelo_elastic_net.rds"))
-desempenho <- read.csv(here("results", "machine_learning", "desempenho_elastic_net.csv"))
 
 # O objeto 'norm_corrigido_GSE166716' já deve estar carregado no seu ambiente R.
 
@@ -300,3 +297,17 @@ matriz_conf_gse_otimizada <- confusionMatrix(
 )
 
 print(matriz_conf_gse_otimizada)
+
+dir <- here("results","external_validation")
+if (!dir.exists(dir)){
+  dir.create(dir, recursive = TRUE)
+}
+
+# Salva o texto completo em um arquivo .txt
+capture.output(matriz_conf_gse, file = file.path(dir,"relatorio_matriz_confusao.txt"))
+capture.output(matriz_conf_gse_otimizada, file = file.path(dir,"relatorio_matriz_confusao_otimizada.txt"))
+write.csv(data.frame("threshold original"= desempenho[1,2],
+                     "threshold otimizado" = threshold_gse),
+          here(dir,"thresholds.csv"),
+          row.names = FALSE)
+

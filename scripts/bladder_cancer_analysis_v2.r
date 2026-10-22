@@ -1137,6 +1137,8 @@ matriz_confusao <- confusionMatrix(factor(classe_predita,levels = c(0, 1)),facto
 
 matriz_confusao
 
+capture.output(matriz_confusao, file = file.path(results_dir, "machine_learning", "relatorio_matriz_confusao.txt"))
+
 
 ## 13. COMPARAÇÃO COM OS RESULTADOS DO LIMMA
 
@@ -1189,6 +1191,40 @@ resultados_modelo <- data.frame(
 # Visualizar o resumo no console
 resultados_modelo
 
+## GRÁFICO DA VALIDAÇÃO CRUZADA — ELASTIC NET
+png(
+  filename = file.path(
+    figures_dir,
+    "grafico_cv_elastic_net.png"
+  ),
+  width = 2400,
+  height = 2000,
+  res = 300
+)
+
+# Guardar as configurações gráficas atuais
+par(
+  mar = c(5, 5, 6, 2) + 0.1,
+  oma = c(0, 0, 1, 0)
+)
+
+# Gerar o gráfico
+plot(
+  modelo_enet,
+  main = "",
+  xlab = "log(lambda)",
+  ylab = "AUC"
+)
+
+# Adicionar o título acima dos números
+title(
+  main = "Validação cruzada — Elastic Net",
+  line = 4,
+  cex.main = 1.3
+)
+
+dev.off()
+
 
 # Exportar os resultados
 write.csv(resultados_modelo,file.path(results_dir,"machine_learning","desempenho_elastic_net.csv"),row.names = FALSE)
@@ -1201,7 +1237,7 @@ saveRDS(
 
 # liberar memória
 rm(X,y,indices_treino,X_train,X_test,y_train,y_test,coef_enet,prob_tumor,
-   roc_modelo,ponto_corte,threshold,classe_predita,matriz_confusao)
+   roc_modelo,ponto_corte,threshold,classe_predita)
 gc()
 
 
@@ -1758,7 +1794,7 @@ message(
 print(resultado_final)
 
 
-# ============== HEATMAP FINAL — 13 CANDIDATOS ==============
+# ============== HEATMAP FINAL ==============
 
 # organizando genes finais
 genes_finais <- as.character(resultado_final$EntrezID)
@@ -1850,7 +1886,7 @@ anotacoes_desc <- data.frame(
 
 arquivo_descoberta <- file.path(
   figures_dir,
-  "heatmap_13_candidatos_descoberta.png"
+  "heatmap_candidatos_descoberta.png"
 )
 
 png(
@@ -1868,7 +1904,7 @@ pheatmap(
   fontsize_row = 10,
   cluster_rows = TRUE,
   cluster_cols = FALSE,
-  main = "13 candidatos finais — Descoberta",
+  main = "candidatos finais — Descoberta",
   border_color = NA
 )
 
@@ -1960,7 +1996,7 @@ matriz_validacao_z <- matriz_validacao_z[,rownames(metadata_heatmap_val),drop = 
 
 arquivo_validacao <- file.path(
   figures_dir,
-  "heatmap_13_candidatos_validacao.png"
+  "heatmap_candidatos_validacao.png"
 )
 
 png(
@@ -1978,7 +2014,7 @@ pheatmap(
   fontsize_row = 10,
   cluster_rows = TRUE,
   cluster_cols = FALSE,
-  main = "13 candidatos finais — Validação",
+  main = "candidatos finais — Validação",
   border_color = NA
 )
 
