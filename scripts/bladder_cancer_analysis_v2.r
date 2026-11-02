@@ -1361,300 +1361,164 @@ dev.off()
 rm(roc_df,gene,values,roc_curve)
 gc()
 
-# ============== REDE DE INTERAÇÃO PROTEÍNA-PROTEÍNA (PPI) ==============
-# STRING + DEGs + destaque dos candidatos finais
+# ============== VISUALIZAÇÃO PPI OTIMIZADA ==============
 
-message("\n", paste(rep("=", 50), collapse = ""))
-message("Construindo rede PPI")
-message(paste(rep("=", 50), collapse = ""))
-
-## Preparação dos genes
-
-# Todos os DEGs da análise principal
-genes_ppi <- unique(as.character(DEGs$EntrezID))
-genes_ppi <- genes_ppi[!is.na(genes_ppi)]
-
-# 15 candidatos finais:
-# genes selecionados pelo Elastic Net que também são DEGs
-genes_candidatos <- unique(
-  as.character(
-    genes_selecionados$EntrezID[
-      genes_selecionados$DEG_limma == TRUE
-    ]
-  )
-)
-
-genes_candidatos <- genes_candidatos[!is.na(genes_candidatos)]
-
-message("DEGs para a rede: ", length(genes_ppi))
-message("Candidatos finais: ", length(genes_candidatos))
-
-## Conectando ao STRING
-
-string_db <- STRINGdb$new(
-  version = "12.0",
-  species = 9606,
-  score_threshold = 700,
-  input_directory = ""
-)
-
-## Mapeando Entrez IDs para STRING IDs
-
-genes_df <- data.frame(
-  ENTREZID = genes_ppi,
-  stringsAsFactors = FALSE
-)
-
-mapped_genes <- string_db$map(
-  genes_df,
-  "ENTREZID",
-  removeUnmappedRows = TRUE
-)
-
-message("Genes mapeados pelo STRING: ", nrow(mapped_genes))
-
-# Verificar quantos candidatos finais foram mapeados
-mapped_candidates <- mapped_genes[
-  mapped_genes$ENTREZID %in% genes_candidatos,
-]
-
-message(
-  "Candidatos finais mapeados: ",
-  nrow(mapped_candidates)
-)
-
-## Obtendo interações entre os DEGs
-
-interactions <- string_db$get_interactions(
-  mapped_genes$STRING_id
-)
-
-# Manter apenas interações em que os dois parceiros
-# pertencem ao conjunto de DEGs
-string_ids <- unique(mapped_genes$STRING_id)
-
-interactions <- interactions[
-  interactions$from %in% string_ids &
-    interactions$to %in% string_ids,
-]
-
-message("Interações encontradas: ", nrow(interactions))
-
-
-## Convertendo STRING IDs novamente para Entrez IDs
-
-id_map <- mapped_genes[, c("STRING_id", "ENTREZID")]
-
-interactions <- merge(
-  interactions,
-  id_map,
-  by.x = "from",
-  by.y = "STRING_id",
-  all.x = TRUE
-)
-
-names(interactions)[names(interactions) == "ENTREZID"] <- "ENTREZID_from"
-
-interactions <- merge(
-  interactions,
-  id_map,
-  by.x = "to",
-  by.y = "STRING_id",
-  all.x = TRUE
-)
-
-names(interactions)[names(interactions) == "ENTREZID"] <- "ENTREZID_to"
-
-## Criando tabela de nós
-
-nodes <- data.frame(
-  name = mapped_genes$ENTREZID,
-  STRING_id = mapped_genes$STRING_id,
-  ENTREZID = mapped_genes$ENTREZID,
-  stringsAsFactors = FALSE
-)
-
-nodes$GeneSymbol <- resultados_limma$GeneSymbol[
-  match(nodes$ENTREZID, resultados_limma$EntrezID)
-]
-
-nodes$logFC <- resultados_limma$logFC[
-  match(nodes$ENTREZID, resultados_limma$EntrezID)
-]
-
-nodes$FDR <- resultados_limma$adj.P.Val[
-  match(nodes$ENTREZID, resultados_limma$EntrezID)
-]
-
-nodes$Candidato <- nodes$ENTREZID %in% genes_candidatos
-
-
-## Criando tabela de arestas
-
-edges <- interactions[, c(
-  "ENTREZID_from",
-  "ENTREZID_to",
-  "combined_score"
-)]
-
-names(edges) <- c("from", "to", "score")
-
-edges <- unique(edges)
-
-
-## Criando objeto igraph
-
-ppi_graph <- graph_from_data_frame(
-  d = edges,
-  vertices = nodes,
-  directed = FALSE
-)
-
-message("Nós no grafo: ", vcount(ppi_graph))
-message("Arestas no grafo: ", ecount(ppi_graph))
-
-
-## CONFIGURAÇÃO DA REDE
-
-# Grau de cada gene = número de interações na rede
-V(ppi_graph)$degree <- degree(ppi_graph)
-
-# Destacar os candidatos finais
-V(ppi_graph)$color <- ifelse(
-  V(ppi_graph)$Candidato,
-  "red",
-  "lightgray"
-)
-
-# Candidatos maiores que os demais genes
-V(ppi_graph)$size <- ifelse(
-  V(ppi_graph)$Candidato,
-  14,
-  5
-)
-
-# Somente os candidatos recebem rótulos
-V(ppi_graph)$label <- ifelse(
-  V(ppi_graph)$Candidato,
-  V(ppi_graph)$GeneSymbol,
-  NA
-)
-
-# Tamanho dos rótulos
-V(ppi_graph)$label.cex <- ifelse(
-  V(ppi_graph)$Candidato,
-  0.8,
-  0
-)
-
-# Arestas discretas
-E(ppi_graph)$color <- "gray80"
-E(ppi_graph)$width <- 0.5
-
-
-## LAYOUT DA REDE
-
-layout_ppi <- layout_with_fr(
+# 1. (Opcional) Manter apenas a maior componente conexa para limpar a periferia
+# Se preferir manter todos os nós conectados com grau > 0, mantenha o seu código original.
+# Aqui vamos manter apenas nós com grau > 0:
+grau <- degree(ppi_graph)
+ppi_plot <- induced_subgraph(
   ppi_graph,
-  weights = E(ppi_graph)$score / 1000
+  vids = V(ppi_graph)[grau > 0]
 )
 
-# Normalizar escala do layout
+message("Nós na figura: ", vcount(ppi_plot))
+message("Arestas na figura: ", ecount(ppi_plot))
+message("Candidatos na figura: ", sum(V(ppi_plot)$Candidato))
+
+# 2. Atributos dos nós
+V(ppi_plot)$degree <- degree(ppi_plot)
+
+# ATENÇÃO: Rotular APENAS os candidatos finais (ou principais hubs) 
+# para evitar poluição visual com centenas de IDs numéricos.
+V(ppi_plot)$label_plot <- ifelse(
+  V(ppi_plot)$Candidato,
+  ifelse(is.na(V(ppi_plot)$GeneSymbol) | V(ppi_plot)$GeneSymbol == "",
+         as.character(V(ppi_plot)$name),
+         as.character(V(ppi_plot)$GeneSymbol)),
+  NA_character_ # Demais nós NÃO ganham rótulo de texto
+)
+
+# Tamanho moderado, baseado no grau
+V(ppi_plot)$node_size <- log1p(V(ppi_plot)$degree)
+
+# 3. Layout calculado uma única vez (Kamada-Kawai ou Fruchterman-Reingold)
+set.seed(123)
+layout_ppi <- layout_with_fr(
+  ppi_plot,
+  weights = E(ppi_plot)$score / 1000,
+  niter = 500
+)
+
+# Normalizar coordenadas
 layout_ppi <- norm_coords(
   layout_ppi,
-  ymin = -1,
-  ymax = 1,
-  xmin = -1,
-  xmax = 1
+  xmin = -1, xmax = 1,
+  ymin = -1, ymax = 1
 )
 
+# 4. Criar figura
+grafico_ppi <- ggraph(
+  ppi_plot,
+  layout = "manual",
+  x = layout_ppi[, 1],
+  y = layout_ppi[, 2]
+) +
+  geom_edge_link(
+    colour = "grey60",          # << Mudado para um cinza mais escuro e visível
+    alpha = 0.35,               # << Leve aumento na opacidade das arestas
+    linewidth = 0.25,
+    show.legend = FALSE
+  ) +
+  geom_node_point(
+    aes(
+      size = node_size,
+      fill = Candidato,
+      alpha = Candidato
+    ),
+    shape = 21,
+    colour = "grey20",          # << Borda dos nós mais escura para destacar o contorno
+    stroke = 0.4
+  ) +
+  scale_fill_manual(
+    values = c(
+      "FALSE" = "#7A8B9E",      # << Cinza-azulado muito mais visível contra o fundo branco
+      "TRUE" = "#0072B2"        # << Azul forte mantido para os candidatos
+    ),
+    breaks = c(FALSE, TRUE),
+    labels = c(
+      "Demais DEGs",
+      "Candidatos finais"
+    ),
+    name = NULL
+  ) +
+  scale_alpha_manual(
+    values = c("FALSE" = 0.85, "TRUE" = 1), # << Aumentado o preenchimento dos demais nós
+    guide = "none"
+  ) +
+  scale_size_continuous(
+    range = c(1.5, 4.8),        # << Leve aumento no tamanho geral para facilitar a visualização
+    guide = "none"
+  ) +
+  # Usar ggrepel para afastar os nomes dos candidatos e evitar sobreposição
+  geom_node_text(
+    aes(
+      label = label_plot
+    ),
+    repel = TRUE,
+    size = 3.2,
+    colour = "#0F2027",
+    fontface = "bold",
+    max.overlaps = Inf,
+    box.padding = 0.4,
+    point.padding = 0.2,
+    na.rm = TRUE
+  ) +
+  labs(
+    title = "Rede PPI dos Genes Diferencialmente Expressos",
+    subtitle = paste0(
+      "STRING v12.0 | Confiança >= 0,700 | ",
+      sum(V(ppi_plot)$Candidato),
+      " candidatos destacados"
+    ),
+    caption = paste(
+      "Nós: genes; Arestas: interações proteicas.\n",
+      "Azul: candidatos selecionados pelo Elastic Net e identificados como DEGs."
+    )
+  ) +
+  theme_void(base_size = 11) +
+  theme(
+    plot.background = element_rect(
+      fill = "white", colour = NA
+    ),
+    plot.title = element_text(
+      size = 13, face = "bold",
+      hjust = 0.5, margin = margin(b = 5)
+    ),
+    plot.subtitle = element_text(
+      size = 9, colour = "grey40",
+      hjust = 0.5, margin = margin(b = 10)
+    ),
+    plot.caption = element_text(
+      size = 8, colour = "grey40",
+      hjust = 0, lineheight = 1.2
+    ),
+    legend.position = "bottom",
+    plot.margin = margin(15, 20, 15, 20)
+  )
 
-## EXPORTAÇÃO DO GRÁFICO DE REDE
-
-png(
-  filename = file.path(
-    figures_dir,
-    "PPI_DEGs_STRING.png"
-  ),
-  width = 5000,
-  height = 5000,
-  res = 400
+# 5. Exportar PNG em alta resolução
+ggsave(
+  file.path(figures_dir, "PPI_DEGs_STRING_otimizado.png"),
+  plot = grafico_ppi,
+  width = 10,
+  height = 9,
+  units = "in",
+  dpi = 300,
+  bg = "white"
 )
 
-plot(
-  ppi_graph,
-  layout = layout_ppi,
-  vertex.frame.color = "gray30",
-  vertex.label.color = "black",
-  edge.curved = 0.05,
-  main = "Rede PPI baseada no STRING"
+# 6. Exportar PDF vetorial
+ggsave(
+  file.path(figures_dir, "PPI_DEGs_STRING_otimizado.pdf"),
+  plot = grafico_ppi,
+  width = 10,
+  height = 9,
+  bg = "white"
 )
 
-dev.off()
-
-
-# Versão vetorial para publicação
-pdf(
-  file = file.path(
-    figures_dir,
-    "PPI_DEGs_STRING.pdf"
-  ),
-  width = 12,
-  height = 12
-)
-
-plot(
-  ppi_graph,
-  layout = layout_ppi,
-  vertex.frame.color = "gray30",
-  vertex.label.color = "black",
-  edge.curved = 0.05,
-  main = "Rede PPI baseada no STRING"
-)
-
-dev.off()
-
-
-## ExportaNDO tabelas para Cytoscape
-dir.create(file.path(results_dir, "PPI"), recursive = TRUE, showWarnings = FALSE)
-
-write.csv(
-  nodes,
-  file.path(results_dir,"PPI", "PPI_nodes.csv"),
-  row.names = FALSE
-)
-
-write.csv(
-  interactions,
-  file.path(results_dir,"PPI", "PPI_interactions.csv"),
-  row.names = FALSE
-)
-
-write.csv(
-  nodes[nodes$Candidato, ],
-  file.path(results_dir,"PPI", "PPI_candidates_15.csv"),
-  row.names = FALSE
-)
-
-# Resumo
-
-message("\nRede PPI concluída.")
-message("Nós: ", vcount(ppi_graph))
-message("Arestas: ", ecount(ppi_graph))
-message(
-  "Candidatos finais mapeados na rede: ",
-  sum(V(ppi_graph)$Candidato)
-)
-
-# limpeza
-rm(
-  genes_ppi, genes_candidatos, genes_df, mapped_genes,
-  mapped_candidates, string_ids, id_map, nodes, edges,
-  interactions, layout_ppi
-)
-
-gc()
-
+print(grafico_ppi)
+message("Figura PPI otimizada exportada com sucesso.")
 
 # ============== RESULTADO FINAL — CANDIDATOS A BIOMARCADORES ==============
 

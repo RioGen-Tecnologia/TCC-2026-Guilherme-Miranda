@@ -167,6 +167,68 @@ results <- topTable(fit2,
                     adjust.method = "BH",
                     sort.by = "none")
 
+# --- PCA DOS DADOS DE EXPRESSÃO ---
+
+message("\n", paste(rep("=", 30), collapse = ""))
+message("Gerando PCA")
+message(paste(rep("=", 30), collapse = ""))
+
+# PCA sobre a matriz voom-normalizada
+pca <- prcomp(
+  t(v$E),
+  center = TRUE,
+  scale. = FALSE
+)
+
+# Variância explicada
+percent_var <- (pca$sdev^2 / sum(pca$sdev^2)) * 100
+
+# Metadados
+pca_df <- data.frame(
+  PC1 = pca$x[, 1],
+  PC2 = pca$x[, 2],
+  condition = dge$samples$condition,
+  study = dge$samples$study
+)
+
+# Criar rótulo combinando estudo e condição
+pca_df$group <- factor(
+  paste(pca_df$study, pca_df$condition, sep = "_")
+)
+
+# --- SALVAR FIGURA ---
+
+png(
+  filename = file.path(
+    figures_dir,
+    "PCA_Recount3.png"
+  ),
+  width = 1800,
+  height = 1600,
+  res = 250
+)
+
+plot(
+  pca_df$PC1,
+  pca_df$PC2,
+  pch = 19,
+  cex = 1.2,
+  xlab = paste0("PC1 (", round(percent_var[1], 1), "%)"),
+  ylab = paste0("PC2 (", round(percent_var[2], 1), "%)"),
+  main = "PCA - TCGA vs GTEx",
+  col = as.numeric(pca_df$group)
+)
+
+legend(
+  "topright",
+  legend = levels(pca_df$group),
+  col = seq_along(levels(pca_df$group)),
+  pch = 19,
+  bty = "n"
+)
+
+dev.off()
+
 
 message("\n", paste(rep("=", 30), collapse = ""))
 message("Análise finalizada")
