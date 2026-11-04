@@ -1361,6 +1361,224 @@ dev.off()
 rm(roc_df,gene,values,roc_curve)
 gc()
 
+
+# ==============  REDE DE INTERAÇÃO PROTEÍNA-PROTEÍNA (PPI) ============== 
+# STRING + DEGs + destaque dos candidatos finais
+
+message("\n", paste(rep("=", 50), collapse = ""))
+message("CONSTRUINDO REDE PPI")
+message(paste(rep("=", 50), collapse = ""))
+
+
+# 1. PREPARAÇÃO DOS GENES
+
+# Todos os DEGs identificados pelo limma
+genes_ppi <- unique(as.character(DEGs$EntrezID))
+genes_ppi <- genes_ppi[!is.na(genes_ppi)]
+
+# Genes selecionados pelo Elastic Net que também são DEGs
+genes_candidatos <- unique(
+  as.character(
+    genes_selecionados$EntrezID[
+      genes_selecionados$DEG_limma == TRUE
+    ]
+  )
+)
+
+genes_candidatos <- genes_candidatos[
+  !is.na(genes_candidatos)
+]
+
+# Garantir que os candidatos pertençam ao conjunto de DEGs
+genes_candidatos <- intersect(
+  genes_candidatos,
+  genes_ppi
+)
+
+message("DEGs para a rede: ", length(genes_ppi))
+message("Candidatos finais: ", length(genes_candidatos))
+
+if (length(genes_ppi) < 2) {
+  stop("Número insuficiente de DEGs para construir a rede PPI.")
+}
+
+
+# 2. CONECTAR AO STRING
+
+string_db <- STRINGdb$new(
+  version = "12.0",
+  species = 9606,
+  score_threshold = 700,
+  input_directory = ""
+)
+
+
+# 3. MAPEAR ENTREZ IDs PARA STRING IDs
+
+genes_df <- data.frame(
+  ENTREZID = genes_ppi,
+  stringsAsFactors = FALSE
+)
+
+mapped_genes <- string_db$map(
+  genes_df,
+  "ENTREZID",
+  removeUnmappedRows = TRUE
+)
+
+# Garantir correspondência única entre STRING IDs e genes
+mapped_genes <- mapped_genes[
+  !duplicated(mapped_genes$STRING_id),
+]
+
+message("Genes mapeados pelo STRING: ", nrow(mapped_genes))
+
+# Verificar candidatos mapeados
+mapped_candidates <- mapped_genes[
+  mapped_genes$ENTREZID %in% genes_candidatos,
+]
+
+message(
+  "Candidatos finais mapeados: ",
+  nrow(mapped_candidates)
+)
+
+if (nrow(mapped_genes) < 2) {
+  stop("Número insuficiente de genes mapeados pelo STRING.")
+}
+
+
+# 4. OBTER INTERAÇÕES ENTRE OS DEGs
+
+interactions <- string_db$get_interactions(
+  mapped_genes$STRING_id
+)
+
+# Manter somente interações entre genes mapeados
+string_ids <- unique(mapped_genes$STRING_id)
+
+interactions <- interactions[
+  interactions$from %in% string_ids &
+    interactions$to %in% string_ids,
+]
+
+message("Interações encontradas: ", nrow(interactions))
+
+if (nrow(interactions) == 0) {
+  stop("Nenhuma interação PPI foi encontrada entre os DEGs.")
+}
+
+
+# 5. CONVERTER STRING IDs PARA ENTREZ IDs
+
+id_map <- mapped_genes[
+  ,
+  c("STRING_id", "ENTREZID")
+]
+
+interactions <- merge(
+  interactions,
+  id_map,
+  by.x = "from",
+  by.y = "STRING_id",
+  all.x = TRUE
+)
+
+names(interactions)[
+  names(interactions) == "ENTREZID"
+] <- "ENTREZID_from"
+
+interactions <- merge(
+  interactions,
+  id_map,
+  by.x = "to",
+  by.y = "STRING_id",
+  all.x = TRUE
+)
+
+names(interactions)[
+  names(interactions) == "ENTREZID"
+] <- "ENTREZID_to"
+
+
+# 6. CRIAR TABELA DE NÓS
+
+nodes <- data.frame(
+  name = as.character(mapped_genes$ENTREZID),
+  STRING_id = mapped_genes$STRING_id,
+  ENTREZID = as.character(mapped_genes$ENTREZID),
+  stringsAsFactors = FALSE
+)
+
+# Adicionar informações da análise limma
+nodes$GeneSymbol <- resultados_limma$GeneSymbol[
+  match(nodes$ENTREZID, resultados_limma$EntrezID)
+]
+
+nodes$logFC <- resultados_limma$logFC[
+  match(nodes$ENTREZID, resultados_limma$EntrezID)
+]
+
+nodes$FDR <- resultados_limma$adj.P.Val[
+  match(nodes$ENTREZID, resultados_limma$EntrezID)
+]
+
+# Identificar os candidatos finais
+nodes$Candidato <- nodes$ENTREZID %in% genes_candidatos
+
+
+# 7. CRIAR TABELA DE ARESTAS
+
+edges <- interactions[
+  ,
+  c(
+    "ENTREZID_from",
+    "ENTREZID_to",
+    "combined_score"
+  )
+]
+
+names(edges) <- c(
+  "from",
+  "to",
+  "score"
+)
+
+edges$from <- as.character(edges$from)
+edges$to <- as.character(edges$to)
+
+edges <- unique(edges)
+
+# Remover eventuais interações sem identificadores válidos
+edges <- edges[
+  !is.na(edges$from) &
+    !is.na(edges$to),
+]
+
+
+# 8. CONSTRUIR OBJETO IGRAPH
+
+ppi_graph <- graph_from_data_frame(
+  d = edges,
+  vertices = nodes,
+  directed = FALSE
+)
+
+message("Nós no grafo: ", vcount(ppi_graph))
+message("Arestas no grafo: ", ecount(ppi_graph))
+
+message(
+  "Candidatos presentes no grafo: ",
+  sum(V(ppi_graph)$Candidato)
+)
+
+if (vcount(ppi_graph) == 0 || ecount(ppi_graph) == 0) {
+  stop("A rede PPI não possui nós ou interações válidas.")
+}
+
+message("Construção da rede PPI concluída.")
+
+
 # ============== VISUALIZAÇÃO PPI OTIMIZADA ==============
 
 # 1. (Opcional) Manter apenas a maior componente conexa para limpar a periferia
